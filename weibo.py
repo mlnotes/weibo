@@ -6,7 +6,7 @@ from urlparse import urljoin, urlsplit
 import re
 import redis
 
-r = redis.StrictRedis(host='zhf2', port=6379, db=0)
+r = redis.StrictRedis(host='zhf2', port=6379, db=1)
 
 def get_status_by_page(page, id, fh):
     url = "http://weibo.cn/%s?page=%s" % (id, page)
@@ -72,18 +72,35 @@ def get_followings(userid):
 		while get_users_by_url(userid, url) == False:
 			print url	
         	time.sleep(5) 
-		time.sleep(5)
+		time.sleep(3)
 	r.save()
 	
-def get_followings_recv(userid):
-	if len(r.keys(userid)) == 0:
-		get_followings(userid)
+def get_followings_recv(current, backup):
+	while True:
+		length = r.llen(current)
+		for i in range(length):
+			key = r.lindex(current, i)
+			users = r.hkeys(key)
+			for u in users:
+				if(len(r.keys(u)) > 0):
+					continue
 
-	followings = r.hkeys(userid)
-	for u in followings:
-		get_followings_recv(u)
+				get_followings(u)
+				r.lpush(backup, u)
+
+		tmp = current
+		current = backup
+		backup = tmp
+		r.delete(backup)
+
+
 
 
 def get_all_followings(userids):
+	current = '.current'
+	backup = '.backup'
 	for userid in userids:
-		get_followings_recv(userid)			
+		get_followings(userid)
+		r.lpush(current, userid)
+
+	get_followings_recv(current, backup)
