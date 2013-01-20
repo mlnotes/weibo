@@ -69,9 +69,13 @@ def get_followings(userid):
 	for i in range(1, pages+1):
 		url = furl + '?page=%d' % i
 		print url
-		while get_users_by_url(userid, url) == False:
+
+		# retry 10 times if fails
+		for i in range(10):
+			if get_users_by_url(userid, url):break
 			print url	
         	time.sleep(5) 
+
 		time.sleep(3)
 	r.save()
 	
@@ -97,7 +101,7 @@ def get_followings_atom(userid):
 	if(r.zscore(log, userid) > 1):
 		return
 
-	r.zadd(log, 1, userid)	# bein
+	r.zadd(log, 1, userid)	# begin
 	get_followings(userid)
 	r.lpush(backup, userid)
 	r.zadd(log, 2, userid)	# end
