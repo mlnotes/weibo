@@ -82,11 +82,7 @@ def get_followings_recv(current, backup):
 			key = r.lindex(current, i)
 			users = r.hkeys(key)
 			for u in users:
-				if(len(r.keys(u)) > 0):
-					continue
-
-				get_followings(u)
-				r.lpush(backup, u)
+				get_followings_atom(u)
 
 		tmp = current
 		current = backup
@@ -94,13 +90,34 @@ def get_followings_recv(current, backup):
 		r.delete(backup)
 
 
+def get_followings_atom(userid):
+	log = '.log'
+	backup = '.backup'
+
+	if(r.zscore(log, userid) > 1):
+		return
+
+	r.zadd(log, 1, userid)	# bein
+	get_followings(userid)
+	r.lpush(backup, userid)
+	r.zadd(log, 2, userid)	# end
+
+def recover():
+	log = '.log'
+	userids = r.zrangebyscore(log, 1, 1)
+	for userid in userids:
+		get_followings_atom(userid)
+
+
+
 
 
 def get_all_followings(userids):
+	recover()
+
 	current = '.current'
 	backup = '.backup'
 	for userid in userids:
-		get_followings(userid)
-		r.lpush(current, userid)
+		get_followings_atom(userid)
 
 	get_followings_recv(current, backup)
