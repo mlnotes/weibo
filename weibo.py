@@ -11,6 +11,8 @@ class weibo:
 		self.db = redis.StrictRedis(host='zhf2', port=6379, db=1)
 		self.log = '.log'
 		self.scanlist = '.list'
+		self.pages = '.pages'
+		self.current = '.current'
 
 	def add_following(self, userid, following):
 		self.db.hset(userid, following, 1)
@@ -50,6 +52,7 @@ class weibo:
 		furl = urljoin('http://weibo.cn/', a[1].attrs['href'])
 		for i in range(1, pages+1):
 			url = furl + '?page=%d' % i
+			self.db.hset(self.pages, userid, url)
 			print url
 
 			# retry 10 times if fails
@@ -57,7 +60,7 @@ class weibo:
 				if self.get_users_by_url(userid, url):break
 				print url
 				time.sleep(5)
-			time.sleep(2)
+			time.sleep(3)
 		self.db.save()
 
 	def get_followings_atom(self, userid, recover=False):
@@ -78,6 +81,9 @@ class weibo:
 		for userid in unfinished:
 			self.get_followings_atom(userid, True)
 
+	def set_current(self, index):
+		u = self.db.lindex(self.scanlist, index)
+		self.db.hset(self.current, u, 1)
 
 	def get_all_followings(self, userids):
 		self.recover()
@@ -89,4 +95,7 @@ class weibo:
 		index = 0
 		while True:
 			if(index < self.db.llen(self.scanlist)):
-				self.get_followings_atom(self.db.lindex(self.scanlist, index))
+				fs = self.db.hkeys(self.db.lindex(self.scanlist, index))	
+				for u in fs:
+					self.get_followings_atom(u)
+				index += 1
